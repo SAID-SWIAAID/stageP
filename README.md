@@ -33,25 +33,21 @@ src/
 ├── package.json/    
 ├── App.js/          
 ```  
-### 1. Clone the project  
-```bash  
-git clone https://github.com/badie16/SoussTalk.git  
-cd sousstalk  
-```  
 
-### 2. Install front-end dependencies  
+
+### . Install front-end dependencies  
 ```bash  
 cd client  
 npm install  
 ```  
 
-### 3. Install back-end dependencies  
+### . Install back-end dependencies  
 ```bash  
 cd ../server  
 npm install  
 ```  
 
-### 4. Run the development server  
+### . Run the development server  
 
 Front-end:  
 ```bash  
