@@ -54,74 +54,55 @@ const generateOTP = async (req, res) => {
 const verifyOTP = async (req, res) => {
   const db = getDatabase()
   
-  if (!db) {
-    return res.status(500).json({ message: "Database not initialized. Check setup." })
-  }
+  if (!db) return res.status(500).json({ message: "Database not initialized. Check setup." })
 
   const { phoneNumber, otp } = req.body
-
-  if (!phoneNumber || !otp) {
-    return res.status(400).json({ message: "Phone number and OTP are required." })
-  }
+  if (!phoneNumber || !otp) return res.status(400).json({ message: "Phone number and OTP are required." })
 
   try {
-    // Find the OTP document for this phone number
     const otpQuery = await db.collection("otps").where("phoneNumber", "==", phoneNumber).limit(1).get()
-
-    if (otpQuery.empty) {
-      return res.status(400).json({ message: "No OTP found for this phone number." })
-    }
+    if (otpQuery.empty) return res.status(400).json({ message: "No OTP found for this phone number." })
 
     const otpDoc = otpQuery.docs[0]
     const otpData = otpDoc.data()
 
-    console.log("🔍 OTP Verification Debug:")
-    console.log("📱 Phone Number:", phoneNumber)
-    console.log("🔢 Provided OTP:", otp)
-    console.log("💾 Stored OTP:", otpData.otp)
-    console.log("⏰ Expires At:", otpData.expiresAt)
-    console.log("⏰ Current Time:", new Date())
-    
-    // Check if OTP has expired - handle both Firestore Timestamp and Date objects
     const expiresAt = otpData.expiresAt.toDate ? otpData.expiresAt.toDate() : new Date(otpData.expiresAt)
-    const now = new Date()
-    
-    console.log("🔍 Is Expired:", expiresAt < now)
-    console.log("⏰ Expires At (converted):", expiresAt)
-    console.log("⏰ Current Time:", now)
-    
-    if (expiresAt < now) {
-      console.log("❌ OTP expired!")
-      // Delete expired OTP
+    if (expiresAt < new Date()) {
       await otpDoc.ref.delete()
       return res.status(400).json({ message: "OTP has expired. Please request a new one." })
     }
+    if (otpData.used) return res.status(400).json({ message: "OTP has already been used." })
 
-    // Check if OTP has been used
-    if (otpData.used) {
-      console.log("❌ OTP already used!")
-      return res.status(400).json({ message: "OTP has already been used." })
-    }
-
-    // Verify OTP
     if (otpData.otp === otp) {
-      console.log("✅ OTP verified successfully!")
-      // Mark OTP as used
       await otpDoc.ref.update({ used: true })
-      
-      // Delete the OTP document after successful verification
+
+      // Create or fetch user
+      let user
+      const userQuery = await db.collection("users").where("phoneNumber", "==", phoneNumber).limit(1).get()
+      if (userQuery.empty) {
+        const newUserRef = await db.collection("users").add({
+          phoneNumber,
+          profileCompleted: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        user = { uid: newUserRef.id, phoneNumber, profileCompleted: false }
+      } else {
+        const doc = userQuery.docs[0]
+        user = { uid: doc.id, ...doc.data() }
+      }
+
       await otpDoc.ref.delete()
-      
-      res.status(200).json({ message: "OTP verified successfully!" })
+      return res.status(200).json({ message: "OTP verified successfully!", user })
     } else {
-      console.log("❌ Invalid OTP!")
-      res.status(400).json({ message: "Invalid OTP." })
+      return res.status(400).json({ message: "Invalid OTP." })
     }
   } catch (error) {
     console.error("Error verifying OTP:", error)
     res.status(500).json({ message: "Failed to verify OTP.", error: error.message })
   }
 }
+
 
 const registerUser = async (req, res) => {
   const db = getDatabase()

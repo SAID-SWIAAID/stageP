@@ -38,25 +38,28 @@ export function onAuthChange(callback) {
 export async function saveUserToBackend(userData) {
   console.log("Saving user data to backend:", userData)
   try {
-    const response = await fetch(`${BACKEND_URL}/users/save-profile`, { // <-- Fix here
+    const url = `${BACKEND_URL}/api/users/save-profile`;
+    console.log("POST URL:", url);
+
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(userData),
-    })
+    });
 
     if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.message || "Failed to save user to backend.")
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Failed to save user to backend.");
     }
 
-    const data = await response.json()
-    console.log("User data saved to backend:", data)
-    return data
+    const data = await response.json();
+    console.log("User data saved to backend:", data);
+    return data;
   } catch (error) {
-    console.error("Error saving user to backend:", error)
-    throw error
+    console.error("Error saving user to backend:", error);
+    throw error;
   }
 }
 
@@ -125,15 +128,13 @@ export async function loginUser(phoneNumber, password) {
  * @returns {Promise<object>} The response from the backend.
  */
 export async function completeUserProfile(uid, profileData) {
+  const bodyToSend = { uid, ...profileData }
+  console.log("👉 Sending to backend:", bodyToSend)
   try {
-    const response = await fetch(`${BACKEND_URL}/auth/complete-profile`, {
+    const response = await fetch(`${BACKEND_URL}/api/users/complete-profile`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // Add authorization header if your backend requires it for profile completion
-        // 'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({ uid, ...profileData }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bodyToSend),
     })
 
     if (!response.ok) {

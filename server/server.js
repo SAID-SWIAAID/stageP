@@ -13,7 +13,7 @@ const boutiqueRoutes = require('./routes/boutiqueRoutes')
 const productRoutes = require('./routes/productRoutes')
 const clientRoutes = require('./routes/clientRoutes')
 const supplierRoutes = require('./routes/supplierRoutes')
-
+const completeProfileRoutes = require('./routes/completeProfileRoutes');
 // Import middleware
 const upload = require('./middleware/uploadMiddleware')
 
@@ -40,7 +40,7 @@ app.use("/api/boutiques", boutiqueRoutes)
 app.use("/api/products", productRoutes)
 app.use("/api/clients", clientRoutes)
 app.use("/api/suppliers", supplierRoutes)
-
+app.use('/api/users', completeProfileRoutes); 
 // Dummy API endpoint for testing
 app.get("/api/dummy", (req, res) => {
   res.status(200).json({ message: "This is a dummy API response from the backend!" })

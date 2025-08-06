@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,11 +16,13 @@ const AuthPage = () => {
   const [otpSent, setOtpSent] = useState(false)
   const [receivedOtp, setReceivedOtp] = useState("")
   const [loading, setLoading] = useState(false)
-  const { loginWithPhoneNumber, confirmOtp, authError, currentUser } = useAuth()
-  const navigate = useNavigate()
+  const [successMessage, setSuccessMessage] = useState(null)
 
-  // Redirect if already logged in
-  React.useEffect(() => {
+  const { loginWithPhoneNumber, confirmOtp, authError, currentUser, setAuthError } = useAuth()
+  const navigate = useNavigate()
+  const otpInputRef = useRef(null)
+
+  useEffect(() => {
     if (currentUser) {
       if (currentUser.profileCompleted) {
         navigate("/dashboard", { replace: true })
@@ -30,31 +32,57 @@ const AuthPage = () => {
     }
   }, [currentUser, navigate])
 
+  useEffect(() => {
+    if (otpSent && otpInputRef.current) {
+      otpInputRef.current.focus()
+    }
+  }, [otpSent])
+
   const handleRequestOtp = async (e) => {
     e.preventDefault()
+    const trimmedPhone = phoneNumber.trim()
+    if (!trimmedPhone) return
+
+    setAuthError(null)
+    setSuccessMessage(null)
     setLoading(true)
-    const result = await loginWithPhoneNumber(phoneNumber)
+
+    const result = await loginWithPhoneNumber(trimmedPhone)
+
     if (result.success) {
       setOtpSent(true)
-      // For demo purposes, if OTP is returned, you can display it
       if (result.otp) {
-        console.log("Demo OTP:", result.otp)
         setReceivedOtp(result.otp)
-        // Auto-fill the OTP input for convenience
         setOtp(result.otp)
       }
+    } else {
+      setAuthError(result.message || "Failed to send OTP")
     }
+
     setLoading(false)
   }
 
   const handleVerifyOtp = async (e) => {
     e.preventDefault()
-    setLoading(true)
-    const result = await confirmOtp(phoneNumber, otp)
-    if (result.success) {
-      console.log("OTP verification successful, waiting for navigation...")
-      // Redirection is handled by the useEffect based on currentUser state
+    if (!/^\d{6}$/.test(otp)) {
+      alert("Please enter a valid 6-digit OTP")
+      return
     }
+
+    setAuthError(null)
+    setSuccessMessage(null)
+    setLoading(true)
+
+    const result = await confirmOtp(phoneNumber.trim(), otp)
+
+    if (result.success) {
+      setAuthError(null) // Clear any previous errors
+      setSuccessMessage("OTP verified successfully!") // Optional success message
+      // navigation handled by useEffect when currentUser is updated
+    } else {
+      setAuthError(result.message || "OTP verification failed")
+    }
+
     setLoading(false)
   }
 
@@ -72,6 +100,12 @@ const AuthPage = () => {
             <Alert variant="destructive" className="mb-4">
               <AlertTitle>Authentication Error</AlertTitle>
               <AlertDescription>{authError}</AlertDescription>
+            </Alert>
+          )}
+          {successMessage && (
+            <Alert className="mb-4 bg-green-50 border-green-200">
+              <AlertTitle className="text-green-800">Success</AlertTitle>
+              <AlertDescription className="text-green-700">{successMessage}</AlertDescription>
             </Alert>
           )}
           {!otpSent ? (
@@ -117,9 +151,10 @@ const AuthPage = () => {
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
                     className="pl-10"
-                    maxLength="6"
+                    maxLength={6}
                     required
                     disabled={loading}
+                    ref={otpInputRef}
                   />
                 </div>
               </div>
@@ -129,7 +164,13 @@ const AuthPage = () => {
               <Button
                 type="button"
                 variant="link"
-                onClick={() => setOtpSent(false)}
+                onClick={() => {
+                  setOtpSent(false)
+                  setOtp("")
+                  setReceivedOtp("")
+                  setAuthError(null)
+                  setSuccessMessage(null)
+                }}
                 className="w-full text-sm text-gray-500 dark:text-gray-400"
                 disabled={loading}
               >

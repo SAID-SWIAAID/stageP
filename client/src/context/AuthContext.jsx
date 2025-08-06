@@ -1,9 +1,8 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect } from "react"
-import { onAuthChange, saveUserToBackend } from "../services/authService"
-import { requestOtp, verifyOtp } from "../services/otpService" // Changed generateOtp to requestOtp
+import React, { createContext, useContext, useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import { requestOtp, verifyOtp } from "../services/otpService"
 
 const AuthContext = createContext(null)
 
@@ -13,120 +12,138 @@ export const AuthProvider = ({ children }) => {
   const [authError, setAuthError] = useState(null)
   const navigate = useNavigate()
 
- useEffect(() => {
-  const unsubscribe = onAuthChange((user) => {
-    if (user) {
-      setCurrentUser(user)
-    } else {
-      // Try to restore from localStorage
-      const stored = localStorage.getItem("user")
-      if (stored) {
-        try {
-          setCurrentUser(JSON.parse(stored))
-        } catch {
+  // Load user from localStorage on app start
+  useEffect(() => {
+    setLoading(true)
+    const stored = localStorage.getItem("user")
+    if (stored) {
+      try {
+        const parsedUser = JSON.parse(stored)
+        if (parsedUser && parsedUser.uid) {
+          setCurrentUser(parsedUser)
+        } else {
           setCurrentUser(null)
+          localStorage.removeItem("user")
         }
-      } else {
+      } catch {
         setCurrentUser(null)
+        localStorage.removeItem("user")
       }
     }
     setLoading(false)
-  })
+  }, [])
 
-  return () => unsubscribe()
-}, [])// Added navigate to dependencies to avoid lint warning [^4]
-
+  // Request OTP
   const loginWithPhoneNumber = async (phoneNumber) => {
     setAuthError(null)
     try {
-      const response = await requestOtp(phoneNumber) // Changed generateOtp to requestOtp
-      console.log("OTP requested:", response)
-      return { success: true, message: response.message }
+      const data = await requestOtp(phoneNumber)
+      return {
+        success: true,
+        otp: data.otp, // optional — backend may send this only in dev
+      }
     } catch (error) {
-      console.error("Login with phone number failed:", error)
-      setAuthError(error.message)
-      return { success: false, message: error.message }
+      setAuthError(error.message || "Failed to request OTP")
+      return {
+        success: false,
+        message: error.message || "Failed to request OTP",
+      }
     }
   }
 
+  // Confirm OTP
   const confirmOtp = async (phoneNumber, otp) => {
-    setAuthError(null)
-    try {
-      const response = await verifyOtp(phoneNumber, otp)
-      console.log("OTP verified:", response)
+  setAuthError(null)
+  try {
+    const data = await verifyOtp(phoneNumber, otp)
 
-      // Simulate user object after successful OTP verification
-      const user = {
-        uid: phoneNumber, // Using phone number as a unique ID for simplicity
-        phoneNumber: phoneNumber,
-        profileCompleted: false, // Assume profile is not completed initially
-      }
-
-      // Save/update user profile in backend (Firestore)
-      const savedUser = await saveUserToBackend(user)
-      console.log("User saved to backend:", savedUser)
-
-      // Update local storage and context with the user data from backend
-      localStorage.setItem("user", JSON.stringify(savedUser))
-      setCurrentUser(savedUser)
-
-      // Redirect based on profile completion
-      if (savedUser && !savedUser.profileCompleted) {
-        navigate("/complete-profile")
-      } else if (savedUser && savedUser.profileCompleted) {
-        navigate("/dashboard")
-      }
-
-      return { success: true, message: response.message, user: savedUser }
-    } catch (error) {
-      console.error("OTP confirmation failed:", error)
-      setAuthError(error.message)
-      return { success: false, message: error.message }
+    if (data.message === "OTP verified successfully!" && data.user) {
+      setCurrentUser(data.user)
+      localStorage.setItem("user", JSON.stringify(data.user))
+      return { success: true }
+    } else {
+      setAuthError(data.message || "OTP verification failed")
+      return { success: false }
     }
+  } catch (error) {
+    setAuthError(error.message || "An unexpected error occurred.")
+    return { success: false }
   }
+}
 
+
+
+
+  // Complete profile
   const completeProfile = async (profileData) => {
     setAuthError(null)
-    try {
-      if (!currentUser || !currentUser.uid) {
-        throw new Error("No authenticated user found to complete profile.")
+    if (!currentUser?.uid) {
+      setAuthError("No authenticated user found to complete profile.")
+      return {
+        success: false,
+        message: "No authenticated user found.",
       }
-      const updatedProfile = await saveUserToBackend({
-        uid: currentUser.uid,
-        phoneNumber: currentUser.phoneNumber,
-        ...profileData,
-        profileCompleted: true,
+    }
+
+    try {
+      const response = await fetch("http://localhost:3001/api/users/complete-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uid: currentUser.uid,
+          ...profileData,
+          profileCompleted: true,
+        }),
       })
-      localStorage.setItem("user", JSON.stringify(updatedProfile))
-      setCurrentUser(updatedProfile)
-      navigate("/dashboard") // Redirect to dashboard after profile completion
-      return { success: true, message: "Profile completed successfully." }
+
+      const updatedProfile = await response.json()
+
+      if (response.ok) {
+        setCurrentUser(updatedProfile.user)
+        localStorage.setItem("user", JSON.stringify(updatedProfile.user))
+        return { success: true }
+      } else {
+        setAuthError(updatedProfile.message || "Failed to complete profile.")
+        return {
+          success: false,
+          message: updatedProfile.message || "Failed to complete profile.",
+        }
+      }
     } catch (error) {
-      console.error("Error completing profile:", error)
-      setAuthError(error.message)
-      return { success: false, message: error.message }
+      setAuthError(error.message || "An unexpected error occurred.")
+      return {
+        success: false,
+        message: error.message || "An unexpected error occurred.",
+      }
     }
   }
 
+  // Logout
   const logout = () => {
     localStorage.removeItem("user")
     setCurrentUser(null)
     navigate("/auth")
   }
 
-  const value = {
-    currentUser,
-    loginWithPhoneNumber,
-    confirmOtp,
-    completeProfile,
-    logout,
-    authError,
-    loading,
-  }
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider
+      value={{
+        currentUser,
+        loginWithPhoneNumber,
+        confirmOtp,
+        completeProfile,
+        logout,
+        authError,
+        loading,
+        setAuthError,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
+// Hook
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
