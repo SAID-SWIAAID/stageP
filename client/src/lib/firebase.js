@@ -3,12 +3,29 @@ import { getAuth } from "firebase/auth"
 import { getFirestore } from "firebase/firestore"
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB5HQ__xR1nWZVvftDIDl0wG6gyMqtS_qk",
-  authDomain: "supplier-bbb9c.firebaseapp.com",
-  projectId: "supplier-bbb9c",
-  storageBucket: "supplier-bbb9c.firebasestorage.app",
-  messagingSenderId: "177970701453",
-  appId: "1:177970701453:web:5fc005e8e00007132ceec4",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+}
+
+// Validate that all required environment variables are present
+const requiredEnvVars = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_AUTH_DOMAIN', 
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID'
+]
+
+const missingVars = requiredEnvVars.filter(varName => !import.meta.env[varName])
+
+if (missingVars.length > 0) {
+  console.error('Missing required environment variables:', missingVars)
+  console.error('Please check your .env file and ensure all Firebase configuration variables are set.')
 }
 
 let app = null
@@ -22,7 +39,7 @@ try {
   console.log("Firebase: App initialized successfully.")
   console.log("Firebase: Auth instance:", auth ? "available" : "NOT available")
   console.log("Firebase: Firestore instance:", db ? "available" : "NOT available")
-  console.log("Firebase: Project ID:", firebaseConfig.projectId)
+  console.log("Firebase: Project ID:", import.meta.env.VITE_FIREBASE_PROJECT_ID)
 } catch (error) {
   console.error("Firebase: Error initializing Firebase app:", error)
 }
