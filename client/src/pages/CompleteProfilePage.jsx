@@ -88,12 +88,12 @@ function CompleteProfilePage() {
     }
 
     try {
-      const res = await completeProfile({
-        name,
-        email,
-        userType,
-        phoneNumber,
-      })
+     const res = await completeProfile({
+  fullName: name,
+  email,
+  userType,
+  phoneNumber,
+})
 
       if (res.success) {
         setSuccess("Profile completed successfully! Redirecting...")
