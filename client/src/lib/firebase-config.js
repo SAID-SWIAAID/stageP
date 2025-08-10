@@ -1,8 +1,5 @@
-import { initializeApp } from "firebase/app"
-import { getAuth } from "firebase/auth"
-import { getFirestore } from "firebase/firestore"
-
-const firebaseConfig = {
+// Firebase configuration using environment variables
+export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -10,6 +7,9 @@ const firebaseConfig = {
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 }
+
+// API configuration
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api"
 
 // Validate that all required environment variables are present
 const requiredEnvVars = [
@@ -27,21 +27,3 @@ if (missingVars.length > 0) {
   console.error('Missing required environment variables:', missingVars)
   console.error('Please check your .env file and ensure all Firebase configuration variables are set.')
 }
-
-let app = null
-let auth = null
-let db = null
-
-try {
-  app = initializeApp(firebaseConfig)
-  auth = getAuth(app)
-  db = getFirestore(app)
-  console.log("Firebase: App initialized successfully.")
-  console.log("Firebase: Auth instance:", auth ? "available" : "NOT available")
-  console.log("Firebase: Firestore instance:", db ? "available" : "NOT available")
-  console.log("Firebase: Project ID:", import.meta.env.VITE_FIREBASE_PROJECT_ID)
-} catch (error) {
-  console.error("Firebase: Error initializing Firebase app:", error)
-}
-
-export { app, auth, db }
