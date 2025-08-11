@@ -1,8 +1,5 @@
-const { getDatabase, admin } = require("../config/DATABASE");
+const { getAuth, getDatabase, admin } = require("../config/DATABASE");
 const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-
-const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret_key_here"; // put in .env in production
 
 const registerSupplier = async (req, res) => {
   try {
@@ -12,13 +9,14 @@ const registerSupplier = async (req, res) => {
       return res.status(400).json({ error: "All fields are required" });
     }
 
+    const auth = getAuth();
     const db = getDatabase();
 
     // Hash password locally
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create Firebase Auth user with phoneNumber and password
-    const userRecord = await admin.auth().createUser({
+    const userRecord = await auth.createUser({
       phoneNumber: phone_number,
       password, // Firebase requires actual password here for user creation
       displayName: store_name,
@@ -78,18 +76,12 @@ const loginSupplier = async (req, res) => {
       return res.status(401).json({ error: "Invalid password" });
     }
 
-    // Generate JWT token
-    const tokenPayload = {
-      uid: supplierDoc.id,
-      phone_number: supplierData.phone_number,
-      store_name: supplierData.store_name,
-    };
-
-    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: "1h" });
+    // Generate custom Firebase token to authenticate the user in frontend
+    const customToken = await admin.auth().createCustomToken(supplierDoc.id);
 
     return res.status(200).json({
       message: "Login successful",
-      token,
+      token: customToken,
     });
   } catch (err) {
     console.error("Login error:", err);
