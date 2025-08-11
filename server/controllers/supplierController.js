@@ -1,41 +1,51 @@
-const { getDatabase, getAuth, admin } = require("../config/DATABASE");
+const { getDatabase, admin } = require("../config/DATABASE");
 
-const getSupplierProfile = async (req, res) => {
+const verifyToken = async (req, res, next) => {
   try {
-    const db = getDatabase();
-    const auth = getAuth();
-
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Unauthorized" });
+    
+    if (!authHeader?.startsWith("Bearer ")) {
+      const error = new Error('Authorization token required');
+      error.statusCode = 401;
+      throw error;
     }
-    const idToken = authHeader.split(" ")[1];
-    const decoded = await auth.verifyIdToken(idToken);
 
-    const doc = await db.collection("suppliers").doc(decoded.uid).get();
-    if (!doc.exists) {
-      return res.status(404).json({ message: "Supplier not found" });
-    }
-    res.json(doc.data());
+    const idToken = authHeader.split(" ")[1];
+    req.decodedToken = await getAuth().verifyIdToken(idToken);
+    next();
   } catch (err) {
-    console.error("Error fetching supplier profile:", err);
-    res.status(401).json({ error: "Unauthorized" });
+    if (!err.statusCode) err.statusCode = 401;
+    next(err);
   }
 };
 
-const updateSupplierProfile = async (req, res) => {
+const getSupplierProfile = async (req, res, next) => {
   try {
     const db = getDatabase();
-    const auth = getAuth();
+    const doc = await db.collection("suppliers").doc(req.decodedToken.uid).get();
 
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Unauthorized" });
+    if (!doc.exists) {
+      const error = new Error('Supplier not found');
+      error.statusCode = 404;
+      throw error;
     }
-    const idToken = authHeader.split(" ")[1];
-    const decoded = await auth.verifyIdToken(idToken);
 
-    await db.collection("suppliers").doc(decoded.uid).set(
+    res.json({
+      success: true,
+      data: doc.data()
+    });
+  } catch (err) {
+    if (!err.statusCode) err.statusCode = 500;
+    next(err);
+  }
+};
+
+const updateSupplierProfile = async (req, res, next) => {
+  try {
+    const db = getDatabase();
+    const uid = req.decodedToken.uid;
+
+    await db.collection("suppliers").doc(uid).set(
       {
         ...req.body,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -43,14 +53,18 @@ const updateSupplierProfile = async (req, res) => {
       { merge: true }
     );
 
-    res.json({ message: "Profile updated" });
+    res.json({ 
+      success: true,
+      message: "Profile updated successfully"
+    });
   } catch (err) {
-    console.error("Error updating supplier profile:", err);
-    res.status(500).json({ error: err.message });
+    if (!err.statusCode) err.statusCode = 500;
+    next(err);
   }
 };
 
 module.exports = {
+  verifyToken,
   getSupplierProfile,
-  updateSupplierProfile,
+  updateSupplierProfile
 };

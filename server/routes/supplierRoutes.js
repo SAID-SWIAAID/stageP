@@ -1,12 +1,27 @@
-const express = require('express')
-const router = express.Router()
+const express = require('express');
+const router = express.Router();
 const { 
-getSupplierProfile,
+  verifyToken,
+  getSupplierProfile,
   updateSupplierProfile
-} = require('../controllers/supplierController.JS')
+} = require('../controllers/supplierController');
 
-router.get('/get', getSupplierProfile)
-router.put('/:id', updateSupplierProfile)
+// Apply token verification middleware to all supplier routes
+router.use(verifyToken);
 
+// GET /api/v1/suppliers/get
+router.get('/get', getSupplierProfile);
 
-module.exports = router
+// PUT /api/v1/suppliers/:id (with ID validation)
+router.put('/:id', async (req, res, next) => {
+  // Verify the ID in URL matches the token's UID
+  if (req.params.id !== req.decodedToken.uid) {
+    return res.status(403).json({ 
+      error: "Forbidden",
+      message: "You can only update your own profile" 
+    });
+  }
+  next();
+}, updateSupplierProfile);
+
+module.exports = router;
