@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { getAuth, onAuthStateChanged } from "firebase/auth"
+import { app } from "../lib/firebase" // adjust this if firebase.js is in a different folder
+
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table"
@@ -30,22 +33,30 @@ function MyProductsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [currentUser, setCurrentUser] = useState(null)
 
-  const BACKEND_URL = import.meta.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001/api'
+  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001/api'
 
+  // Track auth state
   useEffect(() => {
-    fetchProducts()
+    const auth = getAuth(app)
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) setCurrentUser(user)
+      else setCurrentUser(null)
+    })
+    return () => unsubscribe()
   }, [])
+
+  // Fetch products after auth is ready
+  useEffect(() => {
+    if (currentUser) fetchProducts()
+  }, [currentUser])
 
   const fetchProducts = async () => {
     try {
       setLoading(true)
       const response = await fetch(`${BACKEND_URL}/products?supplierId=${currentUser.uid}`)
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch products")
-      }
-      
+      if (!response.ok) throw new Error("Failed to fetch products")
       const data = await response.json()
       setProducts(data)
     } catch (err) {
@@ -67,12 +78,17 @@ function MyProductsPage() {
     }
 
     try {
-      const response = await fetch(`${BACKEND_URL}/products`, {
+      const productWithUser = {
+        ...newProduct,
+        supplierId: currentUser.uid,
+      }
+
+      const response = await fetch(`${BACKEND_URL}/products/create`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(newProduct),
+        body: JSON.stringify(productWithUser),
       })
 
       if (!response.ok) {
@@ -157,6 +173,16 @@ function MyProductsPage() {
   const closeDialogs = () => {
     setError("")
     setSuccess("")
+  }
+
+  if (!currentUser) {
+    return (
+      <Layout>
+        <div className="text-center text-lg py-10 text-gray-600">
+          Please log in to view and manage your products.
+        </div>
+      </Layout>
+    )
   }
 
   return (

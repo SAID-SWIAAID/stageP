@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input"
 import { Label } from "../components/ui/label"
 import { Textarea } from "../components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog"
+import { Dialog, DialogContent,DialogDescription , DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog"
 import { Badge } from "../components/ui/badge"
 import { CheckCircle, XCircle, Plus, Edit, Trash2, Store } from "lucide-react"
 import Layout from "../components/Layout"
@@ -31,87 +31,74 @@ function BoutiqueManagementPage() {
     logo: "",
     banner: ""
   })
-
   const BACKEND_URL = import.meta.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001/api'
 
   useEffect(() => {
-    if (currentUser?.uid) {
-      fetchBoutiques()
-    }
-  }, [currentUser])
-
-  const fetchBoutiques = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch(`${BACKEND_URL}/boutiques/${currentUser.uid}`)
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch boutiques")
-      }
-      
-      const data = await response.json()
-      setBoutiques(data)
-    } catch (err) {
-      console.error("Error fetching boutiques:", err)
-      setError("Failed to load boutiques.")
-    } finally {
-      setLoading(false)
-    }
+  if (currentUser?.uid) {
+    fetchBoutiques()
   }
+}, [currentUser])
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError("")
-    setSuccess("")
+const fetchBoutiques = async () => {
+  try {
+    setLoading(true)
+    const response = await fetch(`${BACKEND_URL}/boutiques/${currentUser.uid}`)
 
-    if (!boutiqueData.name || !boutiqueData.description) {
-      setError("Name and description are required.")
+    if (!response.ok) throw new Error("Failed to fetch boutiques")
+
+    const data = await response.json()
+    setBoutiques(data)
+  } catch (err) {
+    console.error("Error fetching boutiques:", err)
+    setError("Failed to load boutiques.")
+  } finally {
+    setLoading(false)
+  }
+}
+ const handleSubmit = async (e) => {
+  e.preventDefault()
+  setError("")
+  setSuccess("")
+
+  const requiredFields = ["name", "description"]
+  for (const field of requiredFields) {
+    if (!boutiqueData[field]) {
+      setError(`Field "${field}" is required.`)
       return
     }
-
-    try {
-      const url = editingBoutique 
-        ? `${BACKEND_URL}/boutiques/${editingBoutique.id}`
-        : `${BACKEND_URL}/boutiques`
-      
-      const method = editingBoutique ? "PUT" : "POST"
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...boutiqueData,
-          supplierId: currentUser.uid,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Failed to save boutique.")
-      }
-
-      setSuccess(editingBoutique ? "Boutique updated successfully!" : "Boutique created successfully!")
-      setIsDialogOpen(false)
-      setEditingBoutique(null)
-      setBoutiqueData({
-        name: "",
-        description: "",
-        address: "",
-        phone: "",
-        email: "",
-        category: "",
-        logo: "",
-        banner: ""
-      })
-      fetchBoutiques()
-    } catch (err) {
-      console.error("Error saving boutique:", err)
-      setError(err.message || "Error saving boutique. Please try again.")
-    }
   }
 
+  try {
+    const url = editingBoutique
+      ? `${BACKEND_URL}/boutiques/${editingBoutique.id}`
+      : `${BACKEND_URL}/boutiques/create`
+
+    const method = editingBoutique ? "PUT" : "POST"
+
+    const response = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...boutiqueData,
+        supplierId: currentUser.uid,
+      }),
+    })
+
+    const responseData = await response.json()
+    if (!response.ok) {
+      throw new Error(responseData.message || "Failed to save boutique.")
+    }
+
+    setSuccess(editingBoutique ? "Boutique updated successfully!" : "Boutique created successfully!")
+    closeDialog()
+    fetchBoutiques()
+  } catch (err) {
+    console.error("Error saving boutique:", err)
+    setError(err.message || "Error saving boutique. Please try again.")
+  }
+}
   const handleEdit = (boutique) => {
     setEditingBoutique(boutique)
     setBoutiqueData({
@@ -149,21 +136,30 @@ function BoutiqueManagementPage() {
     }
   }
 
-  const openNewBoutiqueDialog = () => {
-    setEditingBoutique(null)
-    setBoutiqueData({
-      name: "",
-      description: "",
-      address: "",
-      phone: "",
-      email: "",
-      category: "",
-      logo: "",
-      banner: ""
-    })
-    setIsDialogOpen(true)
-  }
+ const openNewBoutiqueDialog = () => {
+  setEditingBoutique(null)
+  resetForm()
+  setIsDialogOpen(true)
+}
 
+const resetForm = () => {
+  setBoutiqueData({
+    name: "",
+    description: "",
+    address: "",
+    phone: "",
+    email: "",
+    category: "",
+    logo: "",
+    banner: ""
+  })
+}
+
+const closeDialog = () => {
+  setIsDialogOpen(false)
+  setEditingBoutique(null)
+  resetForm()
+}
   if (loading) {
     return (
       <Layout>
@@ -194,10 +190,13 @@ function BoutiqueManagementPage() {
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>
-                  {editingBoutique ? "Edit Boutique" : "Create New Boutique"}
-                </DialogTitle>
-              </DialogHeader>
+            <DialogTitle>
+              {editingBoutique ? "Edit Boutique" : "Create New Boutique"}
+            </DialogTitle>
+            <DialogDescription>
+              Please fill in the form to save your boutique details.
+            </DialogDescription>
+          </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
