@@ -22,7 +22,7 @@ function BoutiquePage() {
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/products`)
+      const response = await fetch(`${BACKEND_URL}/products/get`)
       if (!response.ok) {
         throw new Error("Failed to fetch products.")
       }
