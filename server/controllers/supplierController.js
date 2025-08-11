@@ -1,11 +1,10 @@
-const { getDatabase, getAuth, admin } = require("../config/DATABASE.JS");
+const { getDatabase, getAuth, admin } = require("../config/DATABASE");
 
-const db = getDatabase();
-const auth = getAuth();
-
-// GET /api/v1/supplier/profile
 const getSupplierProfile = async (req, res) => {
   try {
+    const db = getDatabase();
+    const auth = getAuth();
+
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -24,9 +23,11 @@ const getSupplierProfile = async (req, res) => {
   }
 };
 
-// PATCH /api/v1/supplier/profile
 const updateSupplierProfile = async (req, res) => {
   try {
+    const db = getDatabase();
+    const auth = getAuth();
+
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ error: "Unauthorized" });

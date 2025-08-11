@@ -36,12 +36,9 @@ const initializeDatabase = async () => {
     console.log("🧹 Test document cleaned up");
   } catch (error) {
     console.error("❌ Error initializing Firebase Admin SDK:", error.message);
-    console.log("🔄 Falling back to in-memory storage for development...");
-    db = createInMemoryStore();
-    console.log("⚠️ Using in-memory storage for development mode.");
+    process.exit(1);  // Fail fast if Firebase setup fails
   }
 };
-
 const createInMemoryStore = () => {
   const inMemoryStore = {
     otps: new Map(),
@@ -115,13 +112,20 @@ const createInMemoryStore = () => {
 
   return inMemoryStore;
 };
+const getDatabase = () => {
+  if (!db) throw new Error("Database not initialized. Call initializeDatabase() first.");
+  return db;
+};
 
-const getDatabase = () => db;
+const getAuth = () => {
+  if (!admin.apps.length) throw new Error("Firebase app not initialized.");
+  return admin.auth();
+};
 
 module.exports = {
   initializeDatabase,
   getDatabase,
+  getAuth,  // export your bound function
   admin,
   FieldValue: admin.firestore.FieldValue,
 };
-  

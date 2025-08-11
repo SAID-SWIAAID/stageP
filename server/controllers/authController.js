@@ -1,27 +1,35 @@
-const { getAuth, getDatabase } = require("../config/DATABASE");
+const { getAuth, getDatabase, admin } = require("../config/DATABASE");
+const bcrypt = require("bcrypt");
 
 const registerSupplier = async (req, res) => {
   try {
-    const { store_name, address, phone_number, password, category } = req.body;
+    const { FullName, store_name, address, phone_number, password, category } = req.body;
 
-    if (!store_name || !address || !phone_number || !password || !category) {
+    if (!FullName || !store_name || !address || !phone_number || !password || !category) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
     const auth = getAuth();
     const db = getDatabase();
 
+    // Hash password locally
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create Firebase Auth user with phoneNumber and password
     const userRecord = await auth.createUser({
       phoneNumber: phone_number,
-      password,
+      password, // Firebase requires actual password here for user creation
       displayName: store_name,
     });
 
+    // Store supplier info + hashed password in Firestore
     await db.collection("suppliers").doc(userRecord.uid).set({
+      FullName,
       store_name,
       address,
       phone_number,
       category,
+      hashedPassword,
       delivery_enabled: false,
       delivery_fee: 0,
       createdAt: new Date(),
@@ -38,10 +46,47 @@ const registerSupplier = async (req, res) => {
 };
 
 const loginSupplier = async (req, res) => {
-  // Firebase Admin SDK doesn't handle password login — you'd normally do this from client using Firebase Auth.
-  return res.status(501).json({
-    error: "Login should be handled via Firebase client SDK",
-  });
+  try {
+    const { phone_number, password } = req.body;
+
+    if (!phone_number || !password) {
+      return res.status(400).json({ error: "Phone number and password required" });
+    }
+
+    const db = getDatabase();
+
+    // Query supplier by phone_number
+    const supplierQuery = db.collection("suppliers").where("phone_number", "==", phone_number);
+    const snapshot = await supplierQuery.get();
+
+    if (snapshot.empty) {
+      return res.status(404).json({ error: "Supplier not found" });
+    }
+
+    const supplierDoc = snapshot.docs[0];
+    const supplierData = supplierDoc.data();
+
+    if (!supplierData.hashedPassword) {
+      return res.status(400).json({ error: "No password set for this supplier" });
+    }
+
+    // Compare provided password with stored hashed password
+    const passwordMatch = await bcrypt.compare(password, supplierData.hashedPassword);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: "Invalid password" });
+    }
+
+    // Generate custom Firebase token to authenticate the user in frontend
+    const customToken = await admin.auth().createCustomToken(supplierDoc.id);
+
+    return res.status(200).json({
+      message: "Login successful",
+      token: customToken,
+    });
+  } catch (err) {
+    console.error("Login error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 };
 
 module.exports = { registerSupplier, loginSupplier };
