@@ -1,15 +1,12 @@
 const express = require('express')
 const router = express.Router()
 const { 
-  createSupplier, 
-  getSuppliers, 
-  updateSupplier, 
-  deleteSupplier 
+getSupplierProfile,
+  updateSupplierProfile
 } = require('../controllers/supplierController.JS')
 
-router.post('/', createSupplier)
-router.get('/', getSuppliers)
-router.put('/:id', updateSupplier)
-router.delete('/:id', deleteSupplier)
+router.get('/get', getSupplierProfile)
+router.put('/:id', updateSupplierProfile)
+
 
 module.exports = router
