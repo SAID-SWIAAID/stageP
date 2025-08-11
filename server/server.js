@@ -1,60 +1,102 @@
-const express = require("express")
-const cors = require("cors")
-require("dotenv").config()
+const express = require("express");
+const cors = require("cors");
+require("dotenv").config();
 
-// Import database configuration
-const { initializeDatabase } = require('./config/DATABASE.JS')
+const { initializeDatabase } = require("./config/DATABASE");
 
-// Import routes
-const otpRoutes = require('./routes/otpRoutes')
-const userRoutes = require('./routes/userRoutes')
-const categoryRoutes = require('./routes/categoryRoutes')
-const boutiqueRoutes = require('./routes/boutiqueRoutes')
-const productRoutes = require('./routes/productRoutes')
-const clientRoutes = require('./routes/clientRoutes')
-const supplierRoutes = require('./routes/supplierRoutes')
-const completeProfileRoutes = require('./routes/completeProfileRoutes');
-// Import middleware
-const upload = require('./middleware/uploadMiddleware')
+const app = express();
+const PORT = process.env.PORT || 3001;
 
-const app = express()
-const PORT = process.env.PORT || 3001
+// =======================
+//  Middlewares
+// =======================
+app.use(cors());
+app.use(express.json());
 
-// Initialize database
-initializeDatabase()
+// =======================
+//  Start after DB Init
+// =======================
+(async () => {
+  try {
+    await initializeDatabase();
+    console.log("✅ Database initialized successfully");
 
-// Middleware
-app.use(cors())
-app.use(express.json())
+    // Routes
+    const otpRoutes = require("./routes/otpRoutes");
+    const userRoutes = require("./routes/userRoutes");
+    const completeProfileRoutes = require("./routes/completeProfileRoutes");
+    const categoryRoutes = require("./routes/categoryRoutes");
 
-// Root route
-app.get("/", (req, res) => {
-  res.send("Backend server is running!")
-})
+    const createBoutiqueRoutes = require("./routes/createBoutiqueRoutes");
+    const getSupplierBoutiquesRoutes = require("./routes/getSupplierBoutiquesRoutes");
+    const authRoutes = require("./routes/authRoutes");
+    const createProductRoute = require("./routes/createProductRoute");
+    const getProductsRoute = require("./routes/getProductsRoute");
+    const updateProductRoute = require("./routes/updateProductRoute");
+    const deleteProductRoute = require("./routes/deleteProductRoute");
+    const supplierRoutes = require("./routes/supplierRoutes");
 
-// API Routes
-app.use("/api/otp", otpRoutes)
-app.use("/api/users", userRoutes)
-app.use("/api/categories", categoryRoutes)
-app.use("/api/boutiques", boutiqueRoutes)
-app.use("/api/products", productRoutes)
-app.use("/api/clients", clientRoutes)
-app.use("/api/suppliers", supplierRoutes)
-app.use('/api/users', completeProfileRoutes); 
-// Dummy API endpoint for testing
-app.get("/api/dummy", (req, res) => {
-  res.status(200).json({ message: "This is a dummy API response from the backend!" })
-})
+    // Test route
+    app.get("/said", (req, res) => {
+      res.send("Backend server is running!");
+    });
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
-  console.log(`API endpoints available:`)
-  console.log(`  OTP: /api/otp/*`)
-  console.log(`  Users: /api/users/*`)
-  console.log(`  Categories: /api/categories`)
-  console.log(`  Boutiques: /api/boutiques/*`)
-  console.log(`  Products: /api/products/*`)
-  console.log(`  Clients: /api/clients/*`)
-  console.log(`  Suppliers: /api/suppliers/*`)
-})
+    // API routes
+    app.use("/api/v1/otp", otpRoutes);
+    app.use("/api/v1/users", userRoutes);
+    app.use("/api/v1/users", completeProfileRoutes);
+    app.use("/api/v1/categories", categoryRoutes);
+    app.use("/api/v1/auth", authRoutes);
+
+    app.use("/api/boutiques", createBoutiqueRoutes);
+    app.use("/api/boutiques", getSupplierBoutiquesRoutes);
+
+    app.use("/api/products", createProductRoute);
+    app.use("/api/products", getProductsRoute);
+    app.use("/api/products", updateProductRoute);
+    app.use("/api/products", deleteProductRoute);
+
+    app.use("/api/v1/suppliers", supplierRoutes);
+
+    // Dummy API
+    app.get("/api/v1/dummy", (req, res) => {
+      res.status(200).json({ message: "Dummy API response from backend!" });
+    });
+
+    // 404 handler
+    app.use((req, res) => {
+      res.status(404).json({ message: "API endpoint not found." });
+    });
+
+    // Error handler
+    app.use((err, req, res, next) => {
+      console.error("Global error handler caught:", err);
+      res.status(500).json({ message: "Internal Server Error", error: err.message });
+    });
+
+    // Start server
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+
+  } catch (err) {
+    console.error("❌ Database initialization failed:", err);
+    process.exit(1);
+  }
+})();
+
+// =======================
+//  Start Server
+// =======================
+/*app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📡 API endpoints:`);
+  console.log(`  ➤ /api/otp/*`);
+  console.log(`  ➤ /api/users/*`);
+  console.log(`  ➤ /api/categories/*`);
+  console.log(`  ➤ /api/boutiques/*`);
+  console.log(`  ➤ /api/products/*`);
+  console.log(`  ➤ /api/clients/*`);
+  console.log(`  ➤ /api/suppliers/*`);
+});
+*/

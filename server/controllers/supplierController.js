@@ -1,4 +1,4 @@
-const { getDatabase, getAuth, admin } = require("../config/DATABASE");
+const { getDatabase, getAuth, admin } = require("../config/DATABASE.JS");
 
 const db = getDatabase();
 const auth = getAuth();
