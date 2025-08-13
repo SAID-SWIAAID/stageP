@@ -1,150 +1,138 @@
 // controllers/otpController.js
 const { getDatabase, admin } = require("../config/DATABASE");
-const BulkSMSService = require("../utils/bulkSMSService");
+
+// Helper: Generate 6-digit OTP
+const createRandomOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
 
 const generateOTP = async (req, res) => {
   const db = getDatabase();
-  const { phoneNumber } = req.body;
+  if (!db) return res.status(500).json({ message: "Database not initialized." });
 
-  if (!phoneNumber) {
-    return res.status(400).json({ success: false, error: "Phone number is required" });
-  }
+  const { phoneNumber } = req.body;
+  if (!phoneNumber) return res.status(400).json({ message: "Phone number is required." });
 
   try {
-    // Request BulkSMS to generate and send OTP
-    const result = await BulkSMSService.sendOTP(phoneNumber);
-    
-    if (!result.success) {
-      return res.status(500).json({ 
-        success: false, 
-        error: result.error || "Failed to send OTP" 
-      });
-    }
+    const otp = createRandomOTP();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    // Store the OTP reference in database
-    const otpRecord = {
+    const otpData = {
       phoneNumber,
-      otpReference: result.otpReference,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: 'pending'
+      otp,
+      expiresAt,
+      used: false,
+      createdAt: new Date(),
     };
 
-    await db.collection("otp_requests").add(otpRecord);
+    const existingOtp = await db.collection("otps").where("phoneNumber", "==", phoneNumber).limit(1).get();
 
-    res.status(200).json({ 
-      success: true,
-      message: "OTP sent successfully"
+    if (!existingOtp.empty) {
+      await existingOtp.docs[0].ref.update(otpData);
+      console.log(`Updated OTP for ${phoneNumber}: ${otp}`);
+    } else {
+      await db.collection("otps").add(otpData);
+      console.log(`Created OTP for ${phoneNumber}: ${otp}`);
+    }
+
+    // TODO: Send OTP via SMS provider (Twilio, etc.)
+    // In dev only, we return the OTP. In prod, never return otp.
+    res.status(200).json({
+      message: "OTP generated successfully.",
+      otp, // remove in production
+      expiresAt,
     });
-
   } catch (error) {
-    console.error("OTP generation error:", error);
-    res.status(500).json({ 
-      success: false, 
-      error: "Internal server error" 
-    });
+    console.error("Error generating OTP:", error);
+    res.status(500).json({ message: "Failed to generate OTP.", error: error.message });
   }
 };
 
 const verifyOTP = async (req, res) => {
   const db = getDatabase();
-  const { phoneNumber, otpCode } = req.body;
+  if (!db) return res.status(500).json({ message: "Database not initialized." });
 
-  if (!phoneNumber || !otpCode) {
-    return res.status(400).json({ 
-      success: false, 
-      error: "Phone number and OTP code are required" 
-    });
-  }
+  const { phoneNumber, otp } = req.body;
+  if (!phoneNumber || !otp) return res.status(400).json({ message: "Phone number and OTP are required." });
 
   try {
-    // Find the most recent OTP request for this phone number
-    const otpQuery = await db.collection("otp_requests")
-      .where("phoneNumber", "==", phoneNumber)
-      .orderBy("createdAt", "desc")
-      .limit(1)
-      .get();
-
-    if (otpQuery.empty) {
-      return res.status(404).json({ 
-        success: false, 
-        error: "No OTP request found for this number" 
-      });
-    }
+    const otpQuery = await db.collection("otps").where("phoneNumber", "==", phoneNumber).limit(1).get();
+    if (otpQuery.empty) return res.status(400).json({ message: "OTP not found." });
 
     const otpDoc = otpQuery.docs[0];
     const otpData = otpDoc.data();
 
-    // Verify OTP with BulkSMS
-    const isVerified = await BulkSMSService.verifyOTP(otpData.otpReference, otpCode);
-
-    if (!isVerified) {
-      return res.status(400).json({ 
-        success: false, 
-        error: "Invalid OTP code" 
-      });
+    if (otpData.expiresAt.toDate() < new Date()) {
+      await otpDoc.ref.delete();
+      return res.status(400).json({ message: "OTP expired." });
     }
 
-    // Mark OTP as verified
-    await otpDoc.ref.update({ 
-      status: 'verified',
-      verifiedAt: admin.firestore.FieldValue.serverTimestamp() 
-    });
+    if (otpData.used) return res.status(400).json({ message: "OTP already used." });
 
-    // Create/update user authentication record
-    const authRecord = {
-      phoneNumber,
-      verified: true,
-      lastVerified: admin.firestore.FieldValue.serverTimestamp()
-    };
+    if (otpData.otp !== otp) return res.status(400).json({ message: "Invalid OTP." });
 
-    // Check if user exists
-    const authQuery = await db.collection("users")
-      .where("phoneNumber", "==", phoneNumber)
-      .limit(1)
-      .get();
+    // Mark used
+    await otpDoc.ref.update({ used: true });
 
-    let userRecord;
+    // Update/Create authentication record in Firestore (your own table)
+    const authQuery = await db.collection("authentication").where("phoneNumber", "==", phoneNumber).limit(1).get();
+    let authRecord;
     if (authQuery.empty) {
-      const newUserRef = await db.collection("users").add(authRecord);
-      userRecord = { id: newUserRef.id, ...authRecord };
+      const newAuthRef = await db.collection("authentication").add({
+        phoneNumber,
+        verified: true,
+        role: "supplier",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      authRecord = { id: newAuthRef.id, phoneNumber, verified: true, role: "supplier" };
     } else {
-      const userDoc = authQuery.docs[0];
-      await userDoc.ref.update(authRecord);
-      userRecord = { id: userDoc.id, ...userDoc.data(), ...authRecord };
+      const authDoc = authQuery.docs[0];
+      await authDoc.ref.update({ verified: true, updatedAt: new Date() });
+      authRecord = { id: authDoc.id, ...authDoc.data(), verified: true };
     }
 
-    // Create Firebase Auth user if needed
+    // Remove OTP after usage
+    await otpDoc.ref.delete();
+
+    // Ensure a Firebase Auth user exists for this phoneNumber. We'll use phoneNumber as uid.
+    // IMPORTANT: Firebase phone number format should include the country code, e.g. "+33648653390"
+    const uid = phoneNumber; // choose a unique uid; using phoneNumber is ok if normalized
     try {
+      // Try get user by phone number
       await admin.auth().getUserByPhoneNumber(phoneNumber);
-    } catch (error) {
-      if (error.code === 'auth/user-not-found') {
+      // user exists
+    } catch (err) {
+      // not found -> create user
+      if (err.code === "auth/user-not-found") {
         await admin.auth().createUser({
+          uid,
           phoneNumber,
-          uid: phoneNumber // Using phone number as UID
         });
+        console.log(`Created Firebase Auth user for ${phoneNumber}`);
+      } else {
+        // other error
+        console.error("Error while checking/creating Firebase user:", err);
+        return res.status(500).json({ message: "Auth server error.", error: err.message });
       }
     }
 
-    // Generate custom token
-    const customToken = await admin.auth().createCustomToken(phoneNumber);
+    // Create custom token for client to sign in with
+    const customToken = await admin.auth().createCustomToken(uid);
 
+    // Return custom token to client (client must signInWithCustomToken or exchange it for ID token)
     res.status(200).json({
-      success: true,
-      message: "OTP verified successfully",
-      user: userRecord,
-      token: customToken
+      message: "OTP verified successfully.",
+      authentication: authRecord,
+      customToken,
     });
-
   } catch (error) {
-    console.error("OTP verification error:", error);
-    res.status(500).json({ 
-      success: false, 
-      error: "Internal server error" 
-    });
+    console.error("Error verifying OTP:", error);
+    res.status(500).json({ message: "Failed to verify OTP.", error: error.message });
   }
 };
 
 module.exports = {
   generateOTP,
-  verifyOTP
+  verifyOTP,
 };
