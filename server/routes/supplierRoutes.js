@@ -1,12 +1,23 @@
-const express = require('express')
-const router = express.Router()
+const express = require('express');
+const router = express.Router();
 const { 
-getSupplierProfile,
+  verifyToken,
+  apiLimiter,
+  getSupplierProfile,
   updateSupplierProfile
-} = require('../controllers/supplierController.JS')
+} = require('../controllers/supplierController');
+const { validateUpdateSupplier } = require('../middleware/validationMiddleware');
 
-router.get('/get', getSupplierProfile)
-router.put('/:id', updateSupplierProfile)
+// Apply token verification to all supplier routes
+router.use(verifyToken);
 
+// GET /api/v1/suppliers
+router.get('/get',apiLimiter,verifyToken,getSupplierProfile);
 
-module.exports = router
+// PUT /api/v1/suppliers
+router.put('/update', 
+  validateUpdateSupplier, 
+  updateSupplierProfile
+);
+
+module.exports = router;
