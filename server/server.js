@@ -56,7 +56,7 @@ app.use((req, res, next) => {
     app.get("/api/health", (req, res) => res.json({ status: "OK" }));
     app.get("/said", (req, res) => res.send("Backend server is running!"));
  app.use(`${path}/auth`, authRoutes);
-    app.use(`${path}/suppliers`, supplierRoutes);
+    app.use(`${path}/suppliers/profile`, supplierRoutes);
 
 
     // Error handlers

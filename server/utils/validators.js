@@ -1,6 +1,6 @@
 const validateSupplierUpdate = (updateData) => {
   const allowedFields = [
-    'fullName', 'storeName', 'address', 
+    'storeName', 'address', 
     'category', 'deliveryEnabled', 'deliveryFee',
     'deliveryRadius', 'minOrderAmount'
   ];
