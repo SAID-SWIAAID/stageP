@@ -6,21 +6,18 @@ const { validatePhoneNumber } = require('../utils/validators');
 const registerSupplier = async (req, res) => {
   try {
     const { 
-      fullName, 
-      storeName, 
+      store_name,
       address,  // Expecting { street, city, state, country, zipCode }
-      phoneNumber, 
+      phone_number, 
       password, 
       category 
     } = req.body;
 
     // Validate Inputs
     const errors = [];
-    
-    if (!fullName?.trim()) errors.push('Full name is required');
-    if (!storeName?.trim()) errors.push('Store name is required');
-    if (!address?.street?.trim()) errors.push('Street address is required');
-    if (!validatePhoneNumber(phoneNumber)) {
+    if (!store_name?.trim()) errors.push('Store name is required');
+    if (!address?.trim()) errors.push('Street address is required');
+    if (!validatePhoneNumber(phone_number)) {
       errors.push('Phone number must be in format +212XXXXXXXXX');
     }
     if (!password || password.length < 8) {
@@ -41,7 +38,7 @@ const registerSupplier = async (req, res) => {
 
     // Check for existing supplier
     const snapshot = await db.collection('suppliers')
-      .where('phoneNumber', '==', phoneNumber)
+      .where('phone_number', '==', phone_number)
       .limit(1)
       .get();
 
@@ -60,28 +57,12 @@ const registerSupplier = async (req, res) => {
     const supplierRef = db.collection('suppliers').doc();
     const supplierData = {
       uid: supplierRef.id,
-      fullName: fullName.trim(),
-      storeName: storeName.trim(),
-      address: {
-        street: address.street.trim(),
-        city: address.city?.trim() || '',
-        state: address.state?.trim() || '',
-        country: address.country?.trim() || 'Morocco', // Default to Morocco
-        zipCode: address.zipCode?.trim() || ''
-      },
-      phoneNumber,
+      store_name: store_name.trim(),
+      address: address.trim(),
+      phone_number,
       password: hashedPassword,
       category: category.trim(),
-      deliverySettings: {
-        enabled: false,
-        fee: 0,
-        radius: 5, // Default 5km delivery radius
-        minOrder: 0
-      },
       isActive: true,
-      createdAt: now,
-      updatedAt: now,
-      lastLoginAt: null,
       verificationStatus: 'pending' // For future email/phone verification
     };
 
@@ -90,8 +71,8 @@ const registerSupplier = async (req, res) => {
     // Generate token (without sensitive data)
     const token = generateToken({
       uid: supplierRef.id,
-      phoneNumber,
-      storeName: storeName.trim(),
+      phone_number,
+      store_name: store_name.trim(),
       role: 'supplier'
     });
 
@@ -120,10 +101,10 @@ const registerSupplier = async (req, res) => {
 
 const loginSupplier = async (req, res) => {
   try {
-    const { phoneNumber, password } = req.body;
+    const { phone_number, password } = req.body;
 
     // Enhanced validation
-    if (!phoneNumber || !validatePhoneNumber(phoneNumber)) {
+    if (!phone_number || !validatePhoneNumber(phone_number)) {
       return res.status(400).json({ 
         success: false,
         error: "Valid phone number required",
@@ -143,7 +124,7 @@ const loginSupplier = async (req, res) => {
 
     // Find supplier by phone number
     const snapshot = await db.collection('suppliers')
-      .where('phoneNumber', '==', phoneNumber)
+      .where('phoneNumber', '==', phone_number)
       .limit(1)
       .get();
 
@@ -185,17 +166,16 @@ const loginSupplier = async (req, res) => {
     // Generate JWT token with expiration
     const token = generateToken({
       uid: supplierDoc.id,
-      phoneNumber: supplierData.phoneNumber,
-      storeName: supplierData.storeName,
+      phone_number: supplierData.phone_number,
+      store_name: supplierData.store_name,
       role: 'supplier'
     });
 
     // Prepare response data without sensitive information
     const responseData = {
       uid: supplierDoc.id,
-      fullName: supplierData.fullName,
-      storeName: supplierData.storeName,
-      phoneNumber: supplierData.phoneNumber,
+      store_name: supplierData.store_name,
+      phone_number: supplierData.phone_number,
       address: supplierData.address,
       category: supplierData.category
     };

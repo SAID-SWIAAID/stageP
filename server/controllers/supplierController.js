@@ -5,7 +5,7 @@ require('dotenv').config();
 
 // Validate environment variables
 const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_ISSUER = process.env.JWT_ISSUER || 'your-app-name';
+const JWT_ISSUER = process.env.JWT_ISSUER || 'supplierApp';
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET is not defined in environment variables');
 }
@@ -121,7 +121,6 @@ const getSupplierProfile = async (req, res) => {
     const responseData = {
       supplierInfo: {
         uid: supplierData.uid,
-        fullName: supplierData.fullName,
         storeName: supplierData.storeName,
         phoneNumber: supplierData.phoneNumber,
         category: supplierData.category,
