@@ -1,4 +1,4 @@
-const { getDatabase ,admin } = require("../config/DATABASE");
+const { getDatabase, admin } = require("../config/DATABASE");
 const bcrypt = require('bcrypt');
 const { generateToken } = require('../utils/jwt');
 const { validatePhoneNumber } = require('../utils/validators');
@@ -7,7 +7,7 @@ const registerSupplier = async (req, res) => {
   try {
     const { 
       store_name,
-      address,  // Expecting { street, city, state, country, zipCode }
+      address, 
       phone_number, 
       password, 
       category 
@@ -16,7 +16,9 @@ const registerSupplier = async (req, res) => {
     // Validate Inputs
     const errors = [];
     if (!store_name?.trim()) errors.push('Store name is required');
-    if (!address?.trim()) errors.push('Street address is required');
+    if (!address?.trim()) {
+      errors.push('Address must be an object with street information');
+    }
     if (!validatePhoneNumber(phone_number)) {
       errors.push('Phone number must be in format +212XXXXXXXXX');
     }
@@ -63,7 +65,9 @@ const registerSupplier = async (req, res) => {
       password: hashedPassword,
       category: category.trim(),
       isActive: true,
-      verificationStatus: 'pending' // For future email/phone verification
+      verificationStatus: 'pending',
+      createdAt: now,
+      updatedAt: now
     };
 
     await supplierRef.set(supplierData);
@@ -77,9 +81,14 @@ const registerSupplier = async (req, res) => {
     });
 
     // Prepare response data
-    const responseData = { ...supplierData };
-    delete responseData.password;
-    delete responseData.isActive;
+    const responseData = { 
+      uid: supplierRef.id,
+      store_name: supplierData.store_name,
+      phone_number: supplierData.phone_number,
+      address: supplierData.address,
+      category: supplierData.category,
+      createdAt: supplierData.createdAt
+    };
 
     return res.status(201).json({
       success: true,
@@ -122,9 +131,9 @@ const loginSupplier = async (req, res) => {
 
     const db = getDatabase();
 
-    // Find supplier by phone number
+    // Find supplier by phone number (consistent field name)
     const snapshot = await db.collection('suppliers')
-      .where('phoneNumber', '==', phone_number)
+      .where('phone_number', '==', phone_number)
       .limit(1)
       .get();
 
@@ -160,7 +169,7 @@ const loginSupplier = async (req, res) => {
 
     // Update last login time
     await supplierDoc.ref.update({
-      lastLoginAt: new Date()
+      lastLoginAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
     // Generate JWT token with expiration
@@ -177,7 +186,8 @@ const loginSupplier = async (req, res) => {
       store_name: supplierData.store_name,
       phone_number: supplierData.phone_number,
       address: supplierData.address,
-      category: supplierData.category
+      category: supplierData.category,
+      lastLoginAt: new Date().toISOString()
     };
 
     return res.status(200).json({
