@@ -28,7 +28,8 @@ const validateSupplierUpdate = (updateData) => {
 };
 const validatePhoneNumber = (phone) => {
   // Validates Moroccan phone numbers: +212 followed by 9 digits
-  const regex = /^\+212[6-7]\d{8}$/;
+  // Supports both mobile (6,7) and landline (5) prefixes
+  const regex = /^\+212[5-7]\d{8}$/;
   return regex.test(phone);
 };
 module.exports = {
