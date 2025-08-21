@@ -4,7 +4,7 @@ const {
   verifyToken,
   apiLimiter,
   getSupplierProfile,
-  updateSupplierProfile
+  updateSupplierProfile,
 } = require('../controllers/supplierController');
 const { validateUpdateSupplier } = require('../middleware/validationMiddleware');
 
@@ -12,12 +12,11 @@ const { validateUpdateSupplier } = require('../middleware/validationMiddleware')
 router.use(verifyToken);
 
 // GET /api/v1/suppliers
-router.get('/get',apiLimiter,verifyToken,getSupplierProfile);
+router.get('/',apiLimiter,verifyToken,getSupplierProfile);
 
 // PUT /api/v1/suppliers
-router.put('/update', 
+router.patch('/', 
   validateUpdateSupplier, 
   updateSupplierProfile
 );
-
 module.exports = router;

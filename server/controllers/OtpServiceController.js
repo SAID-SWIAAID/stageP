@@ -10,29 +10,29 @@ const generateOTP = async (req, res) => {
   const db = getDatabase();
   if (!db) return res.status(500).json({ message: "Database not initialized." });
 
-  const { phoneNumber } = req.body;
-  if (!phoneNumber) return res.status(400).json({ message: "Phone number is required." });
+  const { phone_number } = req.body;
+  if (!phone_number) return res.status(400).json({ message: "Phone number is required." });
 
   try {
     const otp = createRandomOTP();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     const otpData = {
-      phoneNumber,
+      phone_number,
       otp,
       expiresAt,
       used: false,
       createdAt: new Date(),
     };
 
-    const existingOtp = await db.collection("otps").where("phoneNumber", "==", phoneNumber).limit(1).get();
+    const existingOtp = await db.collection("otps").where("phoneNumber", "==", phone_number).limit(1).get();
 
     if (!existingOtp.empty) {
       await existingOtp.docs[0].ref.update(otpData);
-      console.log(`Updated OTP for ${phoneNumber}: ${otp}`);
+      console.log(`Updated OTP for ${phone_number}: ${otp}`);
     } else {
       await db.collection("otps").add(otpData);
-      console.log(`Created OTP for ${phoneNumber}: ${otp}`);
+      console.log(`Created OTP for ${phone_number}: ${otp}`);
     }
 
     // TODO: Send OTP via SMS provider (Twilio, etc.)
@@ -52,11 +52,11 @@ const verifyOTP = async (req, res) => {
   const db = getDatabase();
   if (!db) return res.status(500).json({ message: "Database not initialized." });
 
-  const { phoneNumber, otp } = req.body;
-  if (!phoneNumber || !otp) return res.status(400).json({ message: "Phone number and OTP are required." });
+  const { phone_number, otp } = req.body;
+  if (!phone_number || !otp) return res.status(400).json({ message: "Phone number and OTP are required." });
 
   try {
-    const otpQuery = await db.collection("otps").where("phoneNumber", "==", phoneNumber).limit(1).get();
+    const otpQuery = await db.collection("otps").where("phoneNumber", "==", phone_number).limit(1).get();
     if (otpQuery.empty) return res.status(400).json({ message: "OTP not found." });
 
     const otpDoc = otpQuery.docs[0];
@@ -75,17 +75,17 @@ const verifyOTP = async (req, res) => {
     await otpDoc.ref.update({ used: true });
 
     // Update/Create authentication record in Firestore (your own table)
-    const authQuery = await db.collection("authentication").where("phoneNumber", "==", phoneNumber).limit(1).get();
+    const authQuery = await db.collection("authentication").where("phoneNumber", "==", phone_number).limit(1).get();
     let authRecord;
     if (authQuery.empty) {
       const newAuthRef = await db.collection("authentication").add({
-        phoneNumber,
+        phone_number,
         verified: true,
         role: "supplier",
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      authRecord = { id: newAuthRef.id, phoneNumber, verified: true, role: "supplier" };
+      authRecord = { id: newAuthRef.id, phone_number, verified: true, role: "supplier" };
     } else {
       const authDoc = authQuery.docs[0];
       await authDoc.ref.update({ verified: true, updatedAt: new Date() });
@@ -97,19 +97,19 @@ const verifyOTP = async (req, res) => {
 
     // Ensure a Firebase Auth user exists for this phoneNumber. We'll use phoneNumber as uid.
     // IMPORTANT: Firebase phone number format should include the country code, e.g. "+33648653390"
-    const uid = phoneNumber; // choose a unique uid; using phoneNumber is ok if normalized
+    const uid = phone_number; // choose a unique uid; using phoneNumber is ok if normalized
     try {
       // Try get user by phone number
-      await admin.auth().getUserByPhoneNumber(phoneNumber);
+      await admin.auth().getUserByPhoneNumber(phone_number);
       // user exists
     } catch (err) {
       // not found -> create user
       if (err.code === "auth/user-not-found") {
         await admin.auth().createUser({
           uid,
-          phoneNumber,
+          phone_number,
         });
-        console.log(`Created Firebase Auth user for ${phoneNumber}`);
+        console.log(`Created Firebase Auth user for ${phone_number}`);
       } else {
         // other error
         console.error("Error while checking/creating Firebase user:", err);

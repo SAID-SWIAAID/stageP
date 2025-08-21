@@ -43,6 +43,10 @@ const registerSupplier = async (req, res) => {
       .where('phone_number', '==', phone_number)
       .limit(1)
       .get();
+    const storeSnapshot = await db.collection('suppliers')
+      .where('store_name', '==', store_name.trim())
+      .limit(1)
+      .get();
 
     if (!snapshot.empty) {
       return res.status(409).json({
@@ -51,7 +55,13 @@ const registerSupplier = async (req, res) => {
         code: 'PHONE_EXISTS'
       });
     }
-
+    if (!storeSnapshot.empty) {
+      return res.status(409).json({
+        success: false,
+        error: 'Supplier with this store name already exists',
+        code: 'STORE_EXISTS'
+      });
+    }
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 

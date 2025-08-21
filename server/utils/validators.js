@@ -1,6 +1,6 @@
 const validateSupplierUpdate = (updateData) => {
   const allowedFields = [
-    'storeName', 'address', 
+    'store_name','phone_number' ,'address', 
     'category', 'deliveryEnabled', 'deliveryFee',
     'deliveryRadius', 'minOrderAmount'
   ];
@@ -31,7 +31,13 @@ const validatePhoneNumber = (phone) => {
   const regex = /^\+212[6-7]\d{8}$/;
   return regex.test(phone);
 };
+const validateOrderStatus = (status) => {
+  const validStatuses = ['new', 'in_preparation', 'ready', 'delivered', 'cancelled'];
+  return validStatuses.includes(status);
+};
+
 module.exports = {
   validateSupplierUpdate,
-  validatePhoneNumber
+  validatePhoneNumber,
+  validateOrderStatus
 };

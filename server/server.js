@@ -6,24 +6,29 @@ require("dotenv").config();
 const { initializeDatabase } = require("./config/DATABASE");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
+// ✅ IMPORTEZ VOTRE MIDDLEWARE D'AUTHENTIFICATION
+const { verifyToken, securityHeaders, apiLimiter: authLimiter } = require("./middleware/auth");
+
 const app = express();
-const PORT = process.env.PORT || 3000; // Set to 3000 as requested
+const PORT = process.env.PORT || 3000;
 const path = process.env.API_BASE_PATH || '/api/v1';
+
 // =======================
 //  Security Middlewares
 // =======================
 app.use(helmet());
+app.use(securityHeaders); // ✅ AJOUTEZ VOS HEADERS DE SÉCURITÉ
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT','PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Authorization'] // Important for JWT tokens
+  exposedHeaders: ['Authorization']
 }));
 
 // Rate limiting
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // limit each IP to 200 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 200,
   message: "Too many requests from this IP, please try again later"
 });
 
@@ -49,21 +54,30 @@ app.use((req, res, next) => {
     console.log("✅ Database initialized successfully");
 
     // Import routes
+    const tokenRoute  = require("./routes/tokenRoute");
     const authRoutes = require("./routes/authRoutes");
     const supplierRoutes = require("./routes/supplierRoutes");
-
+    const orderRoutes = require("./routes/orderRoutes");
+    const supplierIdRoutes = require("./routes/supplierIdRoutes");  
+    const productRoutes = require("./routes/productRoutes");
     // Setup routes
     app.get("/api/health", (req, res) => res.json({ status: "OK" }));
     app.get("/said", (req, res) => res.send("Backend server is running!"));
- app.use(`${path}/auth`, authRoutes);
+    
+    // ✅ Routes publiques (sans authentication)
+    app.use(`${path}/auth`, authRoutes);
+    app.use(`${path}/token`, tokenRoute);
+
+    
     app.use(`${path}/suppliers/profile`, supplierRoutes);
-
-
+    app.use(`${path}/orders`, orderRoutes);
+    app.use(`${path}/suppliers/profile1`, supplierIdRoutes);
+    app.use(`${path}/products`, productRoutes);
     // Error handlers
     app.use(notFound);
     app.use(errorHandler);
 
-    // Start server with error handling
+    // Start server
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
       console.log(`🌐 Network accessible on http://${require('ip').address()}:${PORT}`);
